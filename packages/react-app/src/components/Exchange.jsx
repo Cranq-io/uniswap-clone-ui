@@ -1,7 +1,7 @@
 import {Contract} from "@ethersproject/contracts";
 import {Alert, Box, Button, FormGroup, FormHelperText, Stack} from "@mui/material";
 import {abis} from "@uniswap-v2-app/contracts";
-import {ERC20, useContractFunction, useEthers, useTokenAllowance, useTokenBalance} from "@usedapp/core";
+import {ERC20, useContractFunction, useEthers, useTokenAllowance, useTokenBalance, useEtherBalance} from "@usedapp/core";
 import {ethers} from "ethers";
 import {formatUnits, parseUnits} from "ethers/lib/utils";
 import React, {useState} from "react";
@@ -42,6 +42,7 @@ const isOperationPending = operationState => operationState.status === "PendingS
 const isOperationFailed = operationState => operationState.status === "Fail" || operationState.status === "Exception";
 const isOperationSucceeded = operationState => operationState.status === "Success";
 
+
 const getFailureMessage = (swapApproveState, swapExecuteState) => {
   if (isOperationPending(swapApproveState) || isOperationPending(swapExecuteState)) {
     return undefined;
@@ -67,9 +68,24 @@ const getSuccessMessage = (swapExecuteState, swapApproveState) => {
   }
   return undefined;
 };
+  
+const getBalance = (token, WETHAddress, tokenBalance, etherBalance) => formatUnits(
+  (token === WETHAddress ? etherBalance : tokenBalance) 
+  ?? parseUnits("0")
+);
+
+const getSwapFunction = (fromToken, toToken, WETHAddress) => {
+  if (fromToken === WETHAddress) {
+    return "swapExactETHForTokens";
+  }
+  if (toToken === WETHAddress) {
+    return "swapExactTokensForETH";
+  } 
+    return "swapExactTokensForTokens";
+};
 
 export function Exchange(props) {
-  const {pools} = props;
+  const {pools, WETHAddress} = props;
   const {account} = useEthers();
 
   const initialFromToken = pools[0].token0Address;
@@ -86,22 +102,29 @@ export function Exchange(props) {
   const fromTokenContract = new Contract(fromToken, ERC20.abi);
   const fromTokenBalance = useTokenBalance(fromToken, account);
   const toTokenBalance = useTokenBalance(toToken, account);
+  const isFromWETH = fromToken === WETHAddress;
+
   const tokenAllowance = useTokenAllowance(fromToken, account, ROUTER_ADDRESS) || parseUnits("0");
-  const approvedNeeded = fromValueBigNumber.gt(tokenAllowance);
+  const approvedNeeded = fromValueBigNumber.gt(tokenAllowance) && fromToken !== WETHAddress;
   const formValueIsGreaterThan0 = fromValueBigNumber.gt(parseUnits("0"));
-  const hasEnoughBalance = fromValueBigNumber.lte(fromTokenBalance ?? parseUnits("0"));
 
   const {state: swapApproveState, send: swapApproveSend} = useContractFunction(fromTokenContract, "approve", {
     transactionName: "onApproveRequested",
     gasLimitBufferPercentage: 10
   });
+
+  const swapFunction = getSwapFunction(fromToken, toToken, WETHAddress);
+
   const {
     state: swapExecuteState,
     send: swapExecuteSend
-  } = useContractFunction(routerContract, "swapExactTokensForTokens", {
-    transactionName: "swapExactTokensForTokens",
+  } = useContractFunction(routerContract, swapFunction, {
+    transactionName: swapFunction,
     gasLimitBufferPercentage: 10
   });
+
+  const etherBalance = useEtherBalance(account);
+  const hasEnoughBalance = fromValueBigNumber.lte(isFromWETH ? etherBalance : fromTokenBalance ?? parseUnits("0"));
 
   const isApproving = isOperationPending(swapApproveState);
   const isSwapping = isOperationPending(swapExecuteState);
@@ -116,16 +139,42 @@ export function Exchange(props) {
   };
 
   const onSwapRequested = () => {
-    swapExecuteSend(
-      fromValueBigNumber,
-      0,
-      [fromToken, toToken],
-      account,
-      Math.floor(Date.now() / 1000) + 60 * 20)
-      .then(_ => {
-        setFromValue("0");
-      });
-  };
+    switch(swapFunction) {
+      case "swapExactETHForTokens":
+        swapExecuteSend(
+            0,
+            [fromToken, toToken],
+            account,
+            Math.floor(Date.now() / 1000) + 60 * 20,
+            {value: fromValueBigNumber}
+            )
+          .then(_ => {
+            setFromValue("0");
+          });
+      break;
+      case "swapExactTokensForETH":
+      swapExecuteSend(
+          fromValueBigNumber,
+          0,
+          [fromToken, toToken],
+          account,
+          Math.floor(Date.now() / 1000) + 60 * 20)
+        .then(_ => {
+          setFromValue("0");
+        });
+      break;
+      default: 
+        swapExecuteSend(
+            fromValueBigNumber,
+            0,
+            [fromToken, toToken],
+            account,
+            Math.floor(Date.now() / 1000) + 60 * 20)
+          .then(_ => {
+            setFromValue("0");
+          });
+      }    
+    };
 
   const onFromValueChange = value => {
     const trimmedValue = value.trim();
@@ -150,9 +199,15 @@ export function Exchange(props) {
         <Stack spacing={2} direction="column" justifyContent="center">
           <FormGroup row={true} className={"rounded filled group centerContent"}>
             <AmountIn value={fromValue} onChange={onFromValueChange}/>
-            <CurrencySelector value={fromToken} onSelect={onFromTokenChange} currencies={availableTokens}/>
+            <CurrencySelector 
+              value={fromToken} 
+              onSelect={onFromTokenChange} 
+              currencies={availableTokens}
+              WETHAddress={WETHAddress}/>
           </FormGroup>
-          <FormHelperText id="outlined-weight-helper-text">{fromTokenBalance ? `Balance: ${formatUnits(fromTokenBalance ?? parseUnits("0"))}` : ""}</FormHelperText>
+          <FormHelperText id = "outlined-weight-helper-text" > {
+            fromTokenBalance ? `Balance: ${getBalance(fromToken, WETHAddress, fromTokenBalance, etherBalance)}` : ""
+          } </FormHelperText>
           <FormGroup row={true} className={"rounded filled group centerContent"}>
             <AmountOut fromToken={fromToken}
               toToken={toToken}
@@ -161,9 +216,12 @@ export function Exchange(props) {
             <CurrencySelector value={toToken}
               onSelect={onToTokenChange}
               currencies={counterpartTokens}
-              showEmpty={"Select currency"}/>
+              showEmpty={"Select currency"}
+              WETHAddress={WETHAddress}/>
           </FormGroup>
-          <FormHelperText id="outlined-weight-helper-text">{toTokenBalance ? `Balance: ${formatUnits(toTokenBalance ?? parseUnits("0"))}` : ""}</FormHelperText>
+          <FormHelperText id = "outlined-weight-helper-text" > 
+            {toTokenBalance ? `Balance: ${getBalance(toToken, WETHAddress, toTokenBalance, etherBalance)}` : ""}
+          </FormHelperText>
         </Stack>
         <Stack alignContent="center" justifyContent="center" spacing={2} direction="row" sx={{paddingTop: "1em"}}>
           {approvedNeeded && !isSwapping
