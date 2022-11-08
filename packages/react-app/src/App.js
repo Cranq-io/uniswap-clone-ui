@@ -10,11 +10,11 @@ import {CurrentBlockNumber} from "./components/CurrentBlockNumber";
 import {Exchange} from "./components/Exchange";
 import {WalletButton} from "./components/WalletButton";
 import {POOLS} from "./config";
-import {usePools} from "./hooks/usePools";
+import {usePoolsWithWETHAddress} from "./hooks/usePoolsWithWETHAddress";
 
 function App() {
   const {account} = useEthers();
-  const [poolsLoading, pools] = usePools(POOLS);
+  const [poolsLoading, pools, WETHAddress] = usePoolsWithWETHAddress(POOLS);
 
   return (
     <>
@@ -26,7 +26,7 @@ function App() {
       <div>
         <Container maxWidth={"md"}>
           {account
-            ? (poolsLoading ? <Alert severity="info">Loading pools, please wait!</Alert> : <Exchange pools={pools}/>)
+            ? (poolsLoading ? <Alert severity="info">Loading pools, please wait!</Alert> : <Exchange pools={pools} WETHAddress={WETHAddress}/>)
             : <Alert severity="info">Please connect your wallet</Alert>}
         </Container>
       </div>
