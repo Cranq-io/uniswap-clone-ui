@@ -11,7 +11,7 @@ export default function Troubleshooting() {
             </ul>
             <p>If running on a local chain (Ganache, Hardhat), please also make sure</p>
             <ul>
-                <li>the local chanin is started</li>
+                <li>the local chain is started</li>
                 <li>Upon first run, if requested by Metamask, you confirmed deployment of the MultiCall contract</li>
                 <li>... and as last resort you may need the clear the Local Storage of your browser for the current url</li>
             </ul>
