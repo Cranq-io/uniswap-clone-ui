@@ -6,15 +6,18 @@ import {
   useEthers
 } from "@usedapp/core";
 import React from "react";
-import {CurrentBlockNumber} from "./components/CurrentBlockNumber";
-import {Exchange} from "./components/Exchange";
-import {WalletButton} from "./components/WalletButton";
-import {POOLS} from "./config";
-import {usePoolsWithWETHAddress} from "./hooks/usePoolsWithWETHAddress";
+import {CurrentBlockNumber} from "./CurrentBlockNumber";
+import {Exchange} from "./Exchange";
+import {WalletButton} from "./WalletButton";
+import {POOLS} from "../config";
+import {usePoolsWithWETHAddress} from "../hooks/usePoolsWithWETHAddress";
 
 function App() {
-  const {account} = useEthers();
+  const {account, error} = useEthers();
   const [poolsLoading, pools, WETHAddress] = usePoolsWithWETHAddress(POOLS);
+  if(error) {
+    throw error;
+  }
 
   return (
     <>
