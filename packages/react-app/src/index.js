@@ -5,7 +5,8 @@ import {DAPP_CONFIG} from "./config";
 import React from "react";
 import ReactDOM from "react-dom";
 
-import App from "./App";
+import App from "./components/App";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 ReactDOM.render(
   <React.StrictMode>
@@ -17,9 +18,11 @@ ReactDOM.render(
       rel="stylesheet"
       href="https://fonts.googleapis.com/icon?family=Material+Icons"
     />
-    <DAppProvider config={DAPP_CONFIG}>
-      <App/>
-    </DAppProvider>
+    <ErrorBoundary>
+      <DAppProvider config={DAPP_CONFIG}>
+          <App/>
+      </DAppProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
   document.getElementById("root")
 );

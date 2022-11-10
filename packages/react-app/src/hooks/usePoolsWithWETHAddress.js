@@ -21,6 +21,8 @@ export function usePoolsWithWETHAddress(mock) {
   const [loading, setLoading] = useState(true);
   const [pools, setPools] = useState({});
   const [WETHAddress, setWETHAddress] = useState("");
+  const [, setError] = useState();
+
   useEffect(() => {
     if(mock) {
       setPools(mock);
@@ -32,6 +34,12 @@ export function usePoolsWithWETHAddress(mock) {
           setPools(data.pools);
           setWETHAddress(data.WETHAddress)
           setLoading(false);
+        })
+        .catch((error) => {
+          // rethrow error in setError to be catchable by ErrorBoundary
+          setError(() => {
+            throw error;
+          });
         })
     }
   }, [mock, readOnlyUrls, readOnlyChainId]);
