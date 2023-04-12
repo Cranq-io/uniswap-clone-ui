@@ -16,10 +16,12 @@ export function useAmountsOut(pairAddress, amountIn, fromToken, toToken) {
   const isValidAmountIn = amountIn.gt(parseUnits("0"));
   const areParamsValid = !!(pairAddress && isValidAmountIn && fromToken && toToken);
 
+  
+
   const {error, value} = useCall(areParamsValid && {
     contract: new Contract(ROUTER_ADDRESS, abis.router02),
     method: "getAmountsOut",
-    args: [amountIn, [fromToken, toToken]]
+    args: [amountIn, [fromToken, toToken],997]
   }
   ) ?? {};
   return error ? parseUnits("0") : value?.amounts[1];

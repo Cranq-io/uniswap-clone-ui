@@ -1,6 +1,9 @@
 {
   "name": "@uniswap-v2-app/monorepo",
   "version": "1.0.0",
+  "engines": {
+    "node": "v16.19.0"
+  },
   "keywords": [
     "uniswap",
     "ethereum",

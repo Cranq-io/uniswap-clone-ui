@@ -1,14 +1,10 @@
 import {MenuItem, Select} from "@mui/material";
 import React from "react";
-import { COIN_NAME } from "../config";
 
 export function CurrencySelector(props) {
-  const {value, onSelect, currencies, showEmpty, WETHAddress} = props;
+  const {value, onSelect, currencies, showEmpty} = props;
 
   const overrideTokenName = (token, tokenName) => {
-    if(token === WETHAddress) {
-      return COIN_NAME;
-    }
     return tokenName;
   }
 

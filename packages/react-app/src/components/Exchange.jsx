@@ -1,7 +1,7 @@
 import {Contract} from "@ethersproject/contracts";
 import {Alert, Box, Button, FormGroup, FormHelperText, Stack} from "@mui/material";
 import {abis} from "@uniswap-v2-app/contracts";
-import {ERC20, useContractFunction, useEthers, useTokenAllowance, useTokenBalance, useEtherBalance} from "@usedapp/core";
+import {ERC20, useContractFunction, useEthers, useTokenAllowance, useTokenBalance} from "@usedapp/core";
 import {ethers} from "ethers";
 import {formatUnits, parseUnits} from "ethers/lib/utils";
 import React, {useState} from "react";
@@ -69,63 +69,77 @@ const getSuccessMessage = (swapExecuteState, swapApproveState) => {
   return undefined;
 };
   
-const getBalance = (token, WETHAddress, tokenBalance, etherBalance) => formatUnits(
-  (token === WETHAddress ? etherBalance : tokenBalance) 
+const getBalance = (token, tokenBalance) => formatUnits(
+  tokenBalance
   ?? parseUnits("0")
 );
 
-const getSwapFunction = (fromToken, toToken, WETHAddress) => {
-  if (fromToken === WETHAddress) {
-    return "swapExactETHForTokens";
-  }
-  if (toToken === WETHAddress) {
-    return "swapExactTokensForETH";
-  } 
+const getSwapFunction = () => {
+ 
     return "swapExactTokensForTokens";
 };
 
 export function Exchange(props) {
-  const {pools, WETHAddress} = props;
+  const {pools} = props;
   const {account} = useEthers();
 
   const initialFromToken = pools[0].token0Address;
-  const [fromValue, setFromValue] = useState("0");
+  const initialToToken = pools[0].token1Address;
+
+  
+
+
+  const [fromValue, setFromValue] = useState("0");// aqua default swap size 
+
+
   const [fromToken, setFromToken] = useState(initialFromToken);
-  const [toToken, setToToken] = useState("");
+  const [toToken, setToToken] = useState(initialToToken);
 
   const fromValueBigNumber = parseUnits(fromValue || "0");
+  console.log("Exchange: fromValue", fromValueBigNumber, " amount to be approved", fromValue )
+
+
   const availableTokens = getAvailableTokens(pools);
+  console.log("Exchange: availableTokens", availableTokens)
+
   const counterpartTokens = getCounterpartTokens(pools, fromToken);
   const pairAddress = findPoolByTokens(pools, fromToken, toToken)?.address ?? "";
+  
 
   const routerContract = new Contract(ROUTER_ADDRESS, abis.router02);
   const fromTokenContract = new Contract(fromToken, ERC20.abi);
   const fromTokenBalance = useTokenBalance(fromToken, account);
   const toTokenBalance = useTokenBalance(toToken, account);
-  const isFromWETH = fromToken === WETHAddress;
+  
 
   const tokenAllowance = useTokenAllowance(fromToken, account, ROUTER_ADDRESS) || parseUnits("0");
-  const approvedNeeded = fromValueBigNumber.gt(tokenAllowance) && fromToken !== WETHAddress;
-  const formValueIsGreaterThan0 = fromValueBigNumber.gt(parseUnits("0"));
+  const approvedNeeded = fromValueBigNumber.gt(tokenAllowance) ;
+
+  
+  const formValueIsGreaterThan0 = fromValueBigNumber.gt(parseUnits("0.00000001"));
 
   const {state: swapApproveState, send: swapApproveSend} = useContractFunction(fromTokenContract, "approve", {
     transactionName: "onApproveRequested",
-    gasLimitBufferPercentage: 10
+    gasLimitBufferPercentage: 99
   });
 
-  const swapFunction = getSwapFunction(fromToken, toToken, WETHAddress);
+  
+
+  const swapFunction = getSwapFunction();//fromToken, toToken, WETHAddress
 
   const {
     state: swapExecuteState,
     send: swapExecuteSend
   } = useContractFunction(routerContract, swapFunction, {
     transactionName: swapFunction,
-    gasLimitBufferPercentage: 10
+    gasLimitBufferPercentage: 99
   });
 
-  const etherBalance = useEtherBalance(account);
-  const hasEnoughBalance = fromValueBigNumber.lte(isFromWETH ? etherBalance : fromTokenBalance ?? parseUnits("0"));
+  
 
+  const hasEnoughBalance = fromValueBigNumber.lte(fromTokenBalance ?? parseUnits("0"));
+
+  
   const isApproving = isOperationPending(swapApproveState);
   const isSwapping = isOperationPending(swapExecuteState);
   const canApprove = !isApproving && approvedNeeded;
@@ -137,6 +151,8 @@ export function Exchange(props) {
   const onApproveRequested = () => {
     swapApproveSend(ROUTER_ADDRESS, ethers.constants.MaxUint256);
   };
+
+  
 
   const onSwapRequested = () => {
     switch(swapFunction) {
@@ -176,22 +192,37 @@ export function Exchange(props) {
       }    
     };
 
+    
+
   const onFromValueChange = value => {
+    
     const trimmedValue = value.trim();
     try {
       trimmedValue && parseUnits(value);
       setFromValue(value);
+      
     } catch (e) {
     }
   };
 
   const onFromTokenChange = async value => {
+    
     setFromToken(value);
   };
 
   const onToTokenChange = async value => {
+   
     setToToken(value);
   };
+
+  // conditions 
+    // canApprove 
+    // approvedNeeded 
+    // isSwapping
+
+    console.error(" can Approve :",canApprove , " approve needed", approvedNeeded , " is approving: ", isApproving)
+
+    console.error(" can Swap :",canSwap , " hasEnoughBalance", hasEnoughBalance , " is swapping: ", isSwapping, " formValueIsGreaterThan0 ", formValueIsGreaterThan0)
 
   return (
     <div className={"exchange"}>
@@ -202,11 +233,10 @@ export function Exchange(props) {
             <CurrencySelector 
               value={fromToken} 
               onSelect={onFromTokenChange} 
-              currencies={availableTokens}
-              WETHAddress={WETHAddress}/>
+              currencies={availableTokens}/>
           </FormGroup>
           <FormHelperText id = "outlined-weight-helper-text" > {
-            fromTokenBalance ? `Balance: ${getBalance(fromToken, WETHAddress, fromTokenBalance, etherBalance)}` : ""
+            fromTokenBalance ? `Balance: ${getBalance(fromToken,  fromTokenBalance)}` : ""
           } </FormHelperText>
           <FormGroup row={true} className={"rounded filled group centerContent"}>
             <AmountOut fromToken={fromToken}
@@ -216,13 +246,13 @@ export function Exchange(props) {
             <CurrencySelector value={toToken}
               onSelect={onToTokenChange}
               currencies={counterpartTokens}
-              showEmpty={"Select currency"}
-              WETHAddress={WETHAddress}/>
+              showEmpty={"Select currency"}/>
           </FormGroup>
           <FormHelperText id = "outlined-weight-helper-text" > 
-            {toTokenBalance ? `Balance: ${getBalance(toToken, WETHAddress, toTokenBalance, etherBalance)}` : ""}
+            {toTokenBalance ? `Balance: ${getBalance(toToken,  toTokenBalance)}` : ""}
           </FormHelperText>
         </Stack>
+
         <Stack alignContent="center" justifyContent="center" spacing={2} direction="row" sx={{paddingTop: "1em"}}>
           {approvedNeeded && !isSwapping
             ?
@@ -235,6 +265,7 @@ export function Exchange(props) {
               onClick={onSwapRequested}>{isSwapping ? "Swapping..." : (hasEnoughBalance ? "Swap" : `Insufficient balance`)}</Button>
           }
         </Stack>
+
         {failureMessage ?
           <Alert severity="error">{failureMessage}</Alert>
           : (successMessage ?

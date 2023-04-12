@@ -6,7 +6,6 @@ import {
   useEthers
 } from "@usedapp/core";
 import React from "react";
-import {CurrentBlockNumber} from "./CurrentBlockNumber";
 import {Exchange} from "./Exchange";
 import {WalletButton} from "./WalletButton";
 import {POOLS} from "../config";
@@ -14,8 +13,9 @@ import {usePoolsWithWETHAddress} from "../hooks/usePoolsWithWETHAddress";
 
 function App() {
   const {account, error} = useEthers();
-  const [poolsLoading, pools, WETHAddress] = usePoolsWithWETHAddress(POOLS);
+  const [poolsLoading, pools] = usePoolsWithWETHAddress(POOLS);
   if(error) {
+    console.error("Ethers Failed to Load")
     throw error;
   }
 
@@ -29,15 +29,14 @@ function App() {
       <div>
         <Container maxWidth={"md"}>
           {account
-            ? (poolsLoading ? <Alert severity="info">Loading pools, please wait!</Alert> : <Exchange pools={pools} WETHAddress={WETHAddress}/>)
+            ? (poolsLoading ? <Alert severity="info">Loading pools, please wait!</Alert> : <Exchange pools={pools}/>)
             : <Alert severity="info">Please connect your wallet</Alert>}
         </Container>
       </div>
       <Stack justifyContent={"flex-end"} width={"100%"} direction={"row"} sx={{position: "absolute", bottom: 0}}>
-        <CurrentBlockNumber />
+      
       </Stack>
     </>
   );
 }
-
 export default App;
